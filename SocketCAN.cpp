@@ -135,7 +135,7 @@ bool SocketCAN::onPrepare()
         }
     }
 
-    if (::pipe2(mPipeFd, O_NONBLOCK) < 0)
+    if (::pipe2(mPipeFd, O_NONBLOCK | O_CLOEXEC) < 0)
     {
         LOGE("Failed to create non-blocking pipe: %s", strerror(errno));
         SAFE_CLOSE(mFd);
@@ -300,7 +300,11 @@ SocketCAN::WriteResult SocketCAN::writeNative(const CanFrame& frame)
             std::memcpy(nativeFrame.data, frame.mData, frame.mLen);
 
         expected = sizeof(struct canfd_frame);
-        written = ::write(mFd, &nativeFrame, expected);
+
+        do
+        {
+            written = ::write(mFd, &nativeFrame, expected);
+        } while(written < 0 && errno == EINTR);
     }
     else
     {
@@ -313,7 +317,10 @@ SocketCAN::WriteResult SocketCAN::writeNative(const CanFrame& frame)
             std::memcpy(nativeFrame.data, frame.mData, frame.mLen);
 
         expected = sizeof(struct can_frame);
-        written = ::write(mFd, &nativeFrame, CAN_MTU);
+        do
+        {
+            written = ::write(mFd, &nativeFrame, expected);
+        } while(written < 0 && errno == EINTR);
     }
 
     if (written == expected)
