@@ -1,3 +1,11 @@
+/**
+ * My simple CAN interface for learning purposes.
+ *
+ * Note: This code was written while learning CAN interface.
+ *       and may contain design or implementation issues.
+ *
+ * author: Kyungin Kim <myohancat@naver.com>
+ */
 #pragma once
 
 #include "CanInterface.hpp"

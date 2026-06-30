@@ -51,6 +51,13 @@ public:
         return true;
     }
 
+    void clear() noexcept
+    {
+        mSize  = 0;
+        mFront = 0;
+        mRear  = 0;
+    }
+
     bool isFull() const  { return mSize >= kCapacity; }
     bool isEmpty() const { return mSize == 0; }
 

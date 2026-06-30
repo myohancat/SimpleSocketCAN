@@ -1,3 +1,11 @@
+/**
+ * My simple CAN interface for learning purposes.
+ *
+ * Note: This code was written while learning CAN interface.
+ *       and may contain design or implementation issues.
+ *
+ * author: Kyungin Kim <myohancat@naver.com>
+ */
 #include "SocketCAN.hpp"
 
 #include "Log.hpp"
@@ -25,19 +33,6 @@
         }                               \
     } while (0)
 #endif
-
-static bool set_nonblock(int fd)
-{
-    int flags = ::fcntl(fd, F_GETFL, 0);
-
-    if (flags < 0)
-        return false;
-
-    if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
-        return false;
-
-    return true;
-}
 
 bool SocketCAN::open(const char* interfaceName, bool isCanFD)
 {
@@ -93,15 +88,7 @@ bool SocketCAN::write(const CanFrame& frame)
 
 bool SocketCAN::onPrepare()
 {
-    if (::pipe(mPipeFd) < 0)
-    {
-        LOGE("Failed to create pipe: %s", strerror(errno));
-        return false;
-    }
-    set_nonblock(mPipeFd[0]);
-    set_nonblock(mPipeFd[1]);
-
-    mFd = ::socket(PF_CAN, SOCK_RAW, CAN_RAW);
+    mFd = ::socket(PF_CAN, SOCK_RAW | SOCK_NONBLOCK | SOCK_CLOEXEC, CAN_RAW);
     if (mFd < 0)
     {
         LOGE("Failed to create CAN socket: %s", strerror(errno));
@@ -110,6 +97,8 @@ bool SocketCAN::onPrepare()
 
     struct ifreq ifr;
     std::strncpy(ifr.ifr_name, mStrIF.c_str(), IFNAMSIZ - 1);
+    ifr.ifr_name[IFNAMSIZ - 1] = '\0';
+
     if (::ioctl(mFd, SIOCGIFINDEX, &ifr) < 0)
     {
         LOGE("Failed to get interface index: %s", strerror(errno));
@@ -140,10 +129,9 @@ bool SocketCAN::onPrepare()
         }
     }
 
-    if (!set_nonblock(mFd))
+    if (::pipe2(mPipeFd, O_NONBLOCK) < 0)
     {
-        LOGE("Failed to set socket non-blocking");
-        SAFE_CLOSE(mFd);
+        LOGE("Failed to create non-blocking pipe: %s", strerror(errno));
         return false;
     }
 
@@ -165,6 +153,8 @@ void SocketCAN::onCleanup()
             mFramePool.free(mCurrentFrame);
             mCurrentFrame = nullptr;
         }
+
+        mTxQueue.clear();
     }
     mFramePool.clear();
 
