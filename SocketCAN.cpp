@@ -36,6 +36,9 @@
 
 bool SocketCAN::open(const char* interfaceName, bool isCanFD)
 {
+    if (interfaceName == nullptr || *interfaceName == '\0')
+        return false;
+
     mStrIF = interfaceName;
     mIsCanFD = isCanFD;
     return mThread.start(*this);
@@ -51,6 +54,9 @@ bool SocketCAN::write(const CanFrame& frame)
     bool requestWriteEvent = false;
 
     std::lock_guard<std::mutex> lock(mTxLock);
+
+    if (!mThread.shouldRun() || mFd < 0)
+        return false;
 
     if (mCurrentFrame == nullptr && mTxQueue.isEmpty())
     {
@@ -132,6 +138,7 @@ bool SocketCAN::onPrepare()
     if (::pipe2(mPipeFd, O_NONBLOCK) < 0)
     {
         LOGE("Failed to create non-blocking pipe: %s", strerror(errno));
+        SAFE_CLOSE(mFd);
         return false;
     }
 
